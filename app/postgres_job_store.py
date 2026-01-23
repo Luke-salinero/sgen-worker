@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from typing import Optional, Dict, Any
+import json
 
 from sqlalchemy import text
 
@@ -57,17 +58,16 @@ class PostgresJobStore:
             with session.begin():
                 session.execute(
                     text("""
-                    UPDATE jobs
-                    SET
-                      status = 'completed',
-                      result = :result,
-                      finished_at = NOW(),
-                      updated_at = NOW()
-                    WHERE job_id = :job_id
-                    """),
+                         UPDATE jobs
+                         SET status      = 'completed',
+                             result      = :result,
+                             finished_at = NOW(),
+                             updated_at  = NOW()
+                         WHERE job_id = :job_id
+                         """),
                     {
                         "job_id": job_id,
-                        "result": result,
+                        "result": json.dumps(result),
                     },
                 )
 
@@ -76,16 +76,16 @@ class PostgresJobStore:
             with session.begin():
                 session.execute(
                     text("""
-                    UPDATE jobs
-                    SET
-                      status = 'failed',
-                      error = :error,
-                      finished_at = NOW(),
-                      updated_at = NOW()
-                    WHERE job_id = :job_id
-                    """),
+                         UPDATE jobs
+                         SET status      = 'failed',
+                             error       = :error,
+                             finished_at = NOW(),
+                             updated_at  = NOW()
+                         WHERE job_id = :job_id
+                         """),
                     {
                         "job_id": job_id,
-                        "error": error,
+                        "error": json.dumps(error),
                     },
                 )
+
