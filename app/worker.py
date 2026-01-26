@@ -1,6 +1,9 @@
 import time
 import logging
 import os
+import json
+import subprocess
+from pathlib import Path
 
 from app.postgres_job_store import PostgresJobStore
 
@@ -30,30 +33,70 @@ class Worker:
                     time.sleep(self.poll_interval_seconds)
                     continue
 
-                # job is a DICT returned from Postgres
                 job_id = job["job_id"]
                 mode = job["mode"]
                 payload = job["payload"]
 
                 logger.info(
                     "Claimed job",
+                    extra={"job_id": job_id, "mode": mode},
+                )
+
+                jobs_root = Path(os.getenv("SGEN_JOBS_ROOT", "/tmp/sgen_jobs"))
+                jobs_root.mkdir(parents=True, exist_ok=True)
+
+                engine_path = os.getenv("SGEN_ENGINE_PATH")
+                if not engine_path:
+                    raise RuntimeError("SGEN_ENGINE_PATH is not set")
+
+                job_dir = jobs_root / str(job_id)
+                results_dir = job_dir / "results"
+                results_dir.mkdir(parents=True, exist_ok=True)
+
+                config_path = job_dir / "config.json"
+                with config_path.open("w") as f:
+                    json.dump(payload, f)
+
+                logger.info(
+                    "Starting engine",
                     extra={
                         "job_id": job_id,
-                        "mode": mode,
+                        "engine_path": engine_path,
+                        "job_dir": str(job_dir),
                     },
                 )
 
-                # TEMPORARY fake execution
-                result = {
-                    "message": "executed by sgen-worker",
-                    "worker_id": self.worker_id,
-                    "payload": payload,
-                }
-
-                self.store.set_job_completed(
-                    job_id=job_id,
-                    result=result,
+                proc = subprocess.run(
+                    [engine_path],
+                    cwd=str(job_dir),
+                    capture_output=True,
+                    text=True,
                 )
+
+                if proc.returncode != 0:
+                    error = {
+                        "returncode": proc.returncode,
+                        "stderr": (proc.stderr or "").strip(),
+                        "stdout": (proc.stdout or "").strip(),
+                    }
+                    self.store.set_job_failed(job_id=str(job_id), error=error)
+                    logger.error(
+                        "Engine failed",
+                        extra={"job_id": job_id, "returncode": proc.returncode},
+                    )
+                    continue
+
+                public_results = results_dir / "public_results.json"
+                public_summary = results_dir / "public_summary.json"
+
+                if public_results.exists():
+                    result = json.loads(public_results.read_text())
+                elif public_summary.exists():
+                    result = json.loads(public_summary.read_text())
+                else:
+                    result = {"stdout": (proc.stdout or "").strip()}
+
+                self.store.set_job_completed(job_id=str(job_id), result=result)
 
                 logger.info(
                     "Completed job",
