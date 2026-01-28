@@ -18,52 +18,46 @@ class Worker:
         self.store = PostgresJobStore()
 
     def run(self) -> None:
-        logger.info(
-            "sgen-worker started",
-            extra={"worker_id": self.worker_id},
-        )
+        logger.info("sgen-worker started", extra={"worker_id": self.worker_id})
+
+        jobs_root = Path(os.getenv("SGEN_JOBS_ROOT", "/tmp/sgen_jobs"))
+        engine_path = os.getenv("SGEN_ENGINE_PATH")
+
+        if not engine_path:
+            raise RuntimeError("SGEN_ENGINE_PATH is not set")
+
+        jobs_root.mkdir(parents=True, exist_ok=True)
 
         while True:
             try:
-                job = self.store.claim_next_pending_job(
-                    worker_id=self.worker_id
-                )
+                job = self.store.claim_next_pending_job(worker_id=self.worker_id)
 
                 if not job:
                     time.sleep(self.poll_interval_seconds)
                     continue
 
                 job_id = job["job_id"]
-                mode = job["mode"]
-                payload = job["payload"]
+                mode = job.get("mode", "live")
+                payload = job.get("payload")
 
-                logger.info(
-                    "Claimed job",
-                    extra={"job_id": job_id, "mode": mode},
-                )
+                logger.info("Claimed job", extra={"job_id": job_id, "mode": mode})
 
-                jobs_root = Path(os.getenv("SGEN_JOBS_ROOT", "/tmp/sgen_jobs"))
-                jobs_root.mkdir(parents=True, exist_ok=True)
-
-                engine_path = os.getenv("SGEN_ENGINE_PATH")
-                if not engine_path:
-                    raise RuntimeError("SGEN_ENGINE_PATH is not set")
+                # payload might already be a dict (jsonb), but be defensive
+                if isinstance(payload, str):
+                    payload = json.loads(payload)
+                if not isinstance(payload, dict):
+                    raise RuntimeError(f"job.payload is not an object/dict (type={type(payload)})")
 
                 job_dir = jobs_root / str(job_id)
                 results_dir = job_dir / "results"
                 results_dir.mkdir(parents=True, exist_ok=True)
 
                 config_path = job_dir / "config.json"
-                with config_path.open("w") as f:
-                    json.dump(payload, f)
+                config_path.write_text(json.dumps(payload, indent=2))
 
                 logger.info(
                     "Starting engine",
-                    extra={
-                        "job_id": job_id,
-                        "engine_path": engine_path,
-                        "job_dir": str(job_dir),
-                    },
+                    extra={"job_id": job_id, "engine_path": engine_path, "cwd": str(job_dir)},
                 )
 
                 proc = subprocess.run(
@@ -80,12 +74,10 @@ class Worker:
                         "stdout": (proc.stdout or "").strip(),
                     }
                     self.store.set_job_failed(job_id=str(job_id), error=error)
-                    logger.error(
-                        "Engine failed",
-                        extra={"job_id": job_id, "returncode": proc.returncode},
-                    )
+                    logger.error("Engine failed", extra={"job_id": job_id, "returncode": proc.returncode})
                     continue
 
+                # Prefer engine-produced outputs if present
                 public_results = results_dir / "public_results.json"
                 public_summary = results_dir / "public_summary.json"
 
@@ -94,18 +86,16 @@ class Worker:
                 elif public_summary.exists():
                     result = json.loads(public_summary.read_text())
                 else:
-                    result = {"stdout": (proc.stdout or "").strip()}
+                    # fallback: at least return captured stdout/stderr
+                    result = {
+                        "stdout": (proc.stdout or "").strip(),
+                        "stderr": (proc.stderr or "").strip(),
+                        "note": "engine did not write results files; returned captured output",
+                    }
 
                 self.store.set_job_completed(job_id=str(job_id), result=result)
-
-                logger.info(
-                    "Completed job",
-                    extra={"job_id": job_id},
-                )
+                logger.info("Completed job", extra={"job_id": job_id})
 
             except Exception as exc:
-                logger.exception(
-                    "Worker loop error",
-                    extra={"error": str(exc)},
-                )
+                logger.exception("Worker loop error", extra={"error": str(exc)})
                 time.sleep(1.0)
