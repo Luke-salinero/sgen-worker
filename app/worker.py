@@ -79,6 +79,8 @@ class Worker:
 
                 # Prefer engine-produced outputs if present
                 public_results = results_dir / "public_results.json"
+
+                # Use this variable for status checking 
                 public_summary = results_dir / "public_summary.json"
 
                 if public_results.exists():
