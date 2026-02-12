@@ -134,3 +134,20 @@ class PostgresJobStore:
             ).first()
 
             return row is not None
+
+    def job_completed(self, job_id: str) -> bool:
+        """
+        True if job status == 'completed'.
+        """
+        with SessionLocal() as session:
+            row = session.execute(
+                text("""
+                    SELECT 1
+                    FROM jobs
+                    WHERE job_id = :job_id
+                      AND status = 'completed'
+                    LIMIT 1
+                """),
+                {"job_id": job_id},
+            ).first()
+            return row is not None
