@@ -151,3 +151,21 @@ class PostgresJobStore:
                 {"job_id": job_id},
             ).first()
             return row is not None
+
+    def job_completed_and_owned(self, job_id: str, api_key_owner: str) -> bool:
+        """
+        True if job status == 'completed'.
+        """
+        with SessionLocal() as session:
+            row = session.execute(
+                text("""
+                    SELECT 1
+                    FROM jobs
+                    WHERE job_id = :job_id
+                      AND status = 'completed'
+                      AND api_key_owner = :api_key_owner
+                    LIMIT 1
+                """),
+                {"job_id": job_id, "api_key_owner": api_key_owner},
+            ).first()
+            return row is not None
