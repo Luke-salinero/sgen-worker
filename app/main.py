@@ -19,10 +19,9 @@ def create_app() -> FastAPI:
     return app
 
 def main():
-    app = create_app()
     worker = Worker()
     worker.run()
 
-
+app = create_app()
 if __name__ == "__main__":
     main()
