@@ -31,14 +31,16 @@ async def results(
         return {"job_id": job_id, "job_status": "pending"}
 
     if job_status == "completed":
-        public_results_path = results_dir / "public_results.json"
+        public_results_path = results_dir / "results_gpu0.json"
+        print(public_results_path)
         if not public_results_path.exists():
+            print("Path doesnt exist")
             raise HTTPException(
                 status_code=500,
                 detail="public_results.json missing for completed job",
             )
         return json.loads(public_results_path.read_text())
-
+    print("Unknown job status")
     raise HTTPException(
         status_code=500,
         detail=f"Unknown job status: {job_status}"
