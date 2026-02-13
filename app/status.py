@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from app.postgres_job_store import PostgresJobStore
 
@@ -14,6 +14,7 @@ store = PostgresJobStore()
 async def status(
     job_id: str,
     api_key_owner: str = Header(..., alias="Api-Key-Owner"),
+    example_count: int = Query(1, ge=1, le=50),
 ) -> Dict[str, Any]:
     job = store.get_job_for_owner(job_id=job_id, api_key_owner=api_key_owner)
     if not job:
@@ -44,6 +45,7 @@ async def status(
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="public_summary.json is not valid JSON")
 
+
     if isinstance(summary, dict) and "status" not in summary:
         summary["status"] = status_val
     if isinstance(summary, dict) and "job_id" not in summary:
@@ -67,9 +69,28 @@ async def status(
             "job_id": job_id,
             "status": summary["status"],
             "found": summary["found"],
-            "runtime": str(round(summary["runtime_seconds"],2)) + "s",
+            "runtime": str(round(summary["runtime_seconds"], 2)) + "s",
             "total work": summary["total_work"],
             "total valid candidates": summary["total_valid_candidates"],
-            "example valid candidate": summary["example_valid_candidate"],
         }
+
+        public_results_path = results_dir / "results_gpu0.json"
+        if not public_results_path.exists():
+            public_summary_returned["example valid candidates"] = [summary["example_valid_candidate"]]
+            return public_summary_returned
+
+        try:
+            result_summary = json.loads(public_results_path.read_text())
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=500, detail="public_results.json is not valid JSON")
+
+        all_examples = result_summary.get("valid_candidates", [])
+        examples = all_examples[:example_count]
+        if example_count == 1:
+            public_summary_returned["example valid candidates"] = (
+                examples[0] if examples else None
+            )
+        else:
+            public_summary_returned["example valid candidates"] = examples
+
     return public_summary_returned
