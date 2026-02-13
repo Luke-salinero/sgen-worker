@@ -37,7 +37,7 @@ async def status(
         return {
             "job_id": job_id,
             "status": status_val,
-            "note": "public_summary.json not available yet",
+            "note": "Summary has yet to be made.",
         }
 
     try:
