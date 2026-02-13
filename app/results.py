@@ -39,6 +39,7 @@ async def results(
                 status_code=500,
                 detail="public_results.json missing for completed job",
             )
+        print(json.loads(public_results_path.read_text()))
         return json.loads(public_results_path.read_text())
     print("Unknown job status")
     raise HTTPException(

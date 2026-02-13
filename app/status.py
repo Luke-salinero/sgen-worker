@@ -51,13 +51,24 @@ async def status(
 
     total_unrounded = int(summary["processed"]) / int(summary["total_work"]) * 100
     percentage = str(round(total_unrounded,2)) + "%"
-    public_summary_returned = {
-        "job_id": job_id,
-        "status": summary["status"],
-        "Found": summary["found"],
-        "Percent Complete": percentage,
-        "Runtime": summary["runtime_seconds"],
-        "ETA": summary["eta_seconds"],
-        "GCPS": summary["gcps_total"],
-    }
+    if summary["status"] != "completed":
+        public_summary_returned = {
+            "job_id": job_id,
+            "status": summary["status"],
+            "found": summary["found"],
+            "percent complete": percentage,
+            "runtime": summary["runtime_seconds"] + "s",
+            "ETA": summary["eta_seconds"] + "s",
+            "GCPS": summary["gcps_total"],
+        }
+    else:
+        public_summary_returned = {
+            "job_id": job_id,
+            "status": summary["status"],
+            "found": summary["found"],
+            "runtime": summary["runtime_seconds"] + "s",
+            "total work": summary["total_work"],
+            "total valid candidates": summary["total_valid_candidates"],
+            "example valid candidate": summary["example_valid_candidate"],
+        }
     return public_summary_returned
