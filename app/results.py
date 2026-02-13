@@ -14,16 +14,32 @@ async def results(
     api_key_owner: str = Header(..., alias="Api-Key-Owner"),
 ):
 
-    if not (store.job_completed_and_owned(job_id=job_id, api_key_owner=api_key_owner)):
-        raise HTTPException(status_code=404, detail="Job not found or not completed")
+    job = store.get_job_for_owner(
+        job_id=job_id,
+        api_key_owner=api_key_owner
+    )
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job_status = job.get("status")
 
     jobs_root = Path(os.getenv("SGEN_JOBS_ROOT", "/tmp/sgen_jobs"))
-    public_results_path = jobs_root / str(job_id) / "results" / "public_results.json"
+    results_dir = jobs_root / str(job_id) / "results"
 
-    if not public_results_path.exists():
-        raise HTTPException(status_code=500, detail="public_results.json missing for completed job")
+    if job_status == "pending" or job_status == "failed":
+        return {"job_id": job_id, "job_status": "pending"}
 
-    try:
+    if job_status == "completed":
+        public_results_path = results_dir / "public_results.json"
+        if not public_results_path.exists():
+            raise HTTPException(
+                status_code=500,
+                detail="public_results.json missing for completed job",
+            )
         return json.loads(public_results_path.read_text())
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="public_results.json is not valid JSON")
+
+    raise HTTPException(
+        status_code=500,
+        detail=f"Unknown job status: {job_status}"
+    )
