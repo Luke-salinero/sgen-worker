@@ -58,9 +58,9 @@ async def status(
             "status": summary["status"],
             "found": summary["found"],
             "percent complete": percentage,
-            "runtime": summary["runtime_seconds"] + "s",
-            "ETA": summary["eta_seconds"] + "s",
-            "GCPS": summary["gcps_total"],
+            "runtime": str(round(summary["runtime_seconds"],2)) + "s",
+            "ETA": str(round(summary["eta_seconds"],2)) + "s",
+            "GCPS": str(round(summary["gcps_total"],2)),
         }
     else:
         public_summary_returned = {
