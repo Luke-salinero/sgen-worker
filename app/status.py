@@ -67,7 +67,7 @@ async def status(
             "job_id": job_id,
             "status": summary["status"],
             "found": summary["found"],
-            "runtime": summary["runtime_seconds"] + "s",
+            "runtime": str(round(summary["runtime_seconds"],2)) + "s",
             "total work": summary["total_work"],
             "total valid candidates": summary["total_valid_candidates"],
             "example valid candidate": summary["example_valid_candidate"],
