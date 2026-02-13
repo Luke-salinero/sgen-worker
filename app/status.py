@@ -49,4 +49,15 @@ async def status(
     if isinstance(summary, dict) and "job_id" not in summary:
         summary["job_id"] = job_id
 
-    return summary
+    total_unrounded = int(summary["processed"]) / int(summary["total_work"]) * 100
+    percentage = str(round(total_unrounded,2)) + "%"
+    public_summary_returned = {
+        "job_id": job_id,
+        "status": summary["status"],
+        "Found": summary["found"],
+        "Percent Complete": percentage,
+        "Runtime": summary["runtime_seconds"],
+        "ETA": summary["eta_seconds"],
+        "GCPS": summary["gcps_total"],
+    }
+    return public_summary_returned
