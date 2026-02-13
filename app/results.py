@@ -27,7 +27,7 @@ async def results(
     jobs_root = Path(os.getenv("SGEN_JOBS_ROOT", "/tmp/sgen_jobs"))
     results_dir = jobs_root / str(job_id) / "results"
 
-    if job_status == "pending" or job_status == "failed":
+    if job_status == "pending" or job_status == "failed" or job_status == "running":
         return {"job_id": job_id, "job_status": "pending"}
 
     if job_status == "completed":
