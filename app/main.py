@@ -1,6 +1,6 @@
 from app.worker import Worker
 from fastapi import FastAPI
-from results import results
+from app.results import router as results_router
 
 def create_app() -> FastAPI:
     """Application factory for the S-Gen gateway.
@@ -15,7 +15,7 @@ def create_app() -> FastAPI:
     )
 
     # Routers
-    app.include_router(results.router)
+    app.include_router(results_router)
     return app
 
 def main():
